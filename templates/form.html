@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Tasvir Yaratuvchi</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #0070f3;
+      font-family: 'Segoe UI', sans-serif;
+      overflow-x: hidden;
+    }
+    .chat-container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 30px 15px 0 280px;
+    }
+    .chat-list {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 0 15px;
+      display: flex;
+      flex-direction: column;
+    }
+    .chat-bubble {
+      border-radius: 16px;
+      padding: 12px 18px;
+      margin: 10px 0;
+      max-width: 70%;
+      animation: fadeIn 0.4s ease-in-out;
+      word-wrap: break-word;
+    }
+    .chat-bubble.chat-user {
+      align-self: flex-end;
+      background-color: #d1e7dd;
+      color: #000;
+      border-radius: 20px 20px 5px 20px;
+      margin-left: auto;
+    }
+    .chat-bubble.chat-bot {
+      align-self: flex-start;
+      background-color: #f1f1f1;
+      border-radius: 20px 20px 20px 5px;
+      padding: 10px;
+      margin-right: auto;
+    }
+    .form-control.auto-expand {
+      resize: none;
+      overflow-y: hidden;
+      transition: height 0.2s ease;
+    }
+    .image-grid {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .image-grid.one-image {
+      grid-template-columns: 1fr;
+    }
+    .image-grid.two-images {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .image-grid.three-plus-images {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .image-card {
+      background: white;
+      padding: 5px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      position: relative;
+    }
+    .image-card img {
+      width: 100%;
+      height: auto;
+      border-radius: 6px;
+      max-height: 200px;
+      object-fit: cover;
+    }
+    .download-btn {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.5);
+      color: white;
+      border-radius: 50%;
+      padding: 5px;
+      font-size: 1.2rem;
+      text-decoration: none;
+      transition: background 0.3s;
+    }
+    .download-btn:hover {
+      background: rgba(0, 0, 0, 0.7);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    /* Sidebar */
+    #sidebar {
+      background-color: #1c1c1c;
+      color: white;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 250px;
+      height: 100%;
+      overflow-y: auto;
+      z-index: 1000;
+    }
+    #query-history li {
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+    #query-history li:hover {
+      background-color: #343a40;
+    }
+    #sidebar a {
+      color: white;
+      text-decoration: none;
+      display: block;
+    }
+    #sidebar a:hover {
+      color: #d1e7dd;
+    }
+    #toggleSidebar {
+      position: fixed;
+      left: 10px;
+      top: 10px;
+      z-index: 1100;
+    }
+    /* Scrollbar styling */
+    .chat-list::-webkit-scrollbar {
+      width: 8px;
+    }
+    .chat-list::-webkit-scrollbar-thumb {
+      background-color: #6c757d;
+      border-radius: 10px;
+    }
+    /* Mobil moslashuv */
+    @media (max-width: 576px) {
+      .chat-container {
+        padding-left: 15px;
+      }
+      .image-grid.two-images, .image-grid.three-plus-images {
+        grid-template-columns: 1fr;
+      }
+      #sidebar {
+        width: 200px;
+      }
+      .download-btn {
+        font-size: 1rem;
+        padding: 3px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Toggle Button -->
+<button id="toggleSidebar" class="btn btn-dark d-none" style="top: 1rem; left: 1rem; z-index: 1050;">☰</button>
+
+<!-- Sidebar -->
+<div id="sidebar" class="p-3">
+  <div class="d-flex justify-content-between align-items-center">
+    <h5>📁 Mavzular</h5>
+    <button id="closeSidebar" class="btn btn-sm btn-outline-light">✖</button>
+  </div>
+
+  <ul class="list-unstyled mt-3" id="query-history">
+    <li>
+      <label class="text-white mb-1">➕ Yangi mavzu:</label>
+      <input type="hidden" name="subject_id" id="subjectIdInput">
+      <button class="btn btn-sm btn-success w-100 mb-2" onclick="startNewSubject()">Yangi chat</button>
+    </li>
+    <li class="text-white mb-2">📂 Eski mavzular:</li>
+    {% for s in subjects %}
+    <li class="subject-item py-1 px-2 {% if s.id == selected_subject_id %}bg-secondary{% endif %}">
+      <a href="javascript:void(0)" onclick="selectSubject('{{ s.id }}')">{{ s.subject|default:"Yangi mavzu" }}</a>
+    </li>
+    {% empty %}
+    <li class="text-muted">Mavzular mavjud emas</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<!-- Chat UI -->
+<div class="chat-container">
+  <h2 class="text-center text-white mb-4">🧠 AI Image Creator</h2>
+
+  <div id="tokenErrorAlert" class="alert alert-danger alert-dismissible fade show d-none" role="alert">
+    ❌ Test tokenlaringiz tugagan. Davom etish uchun iltimos <a href="/login">ro‘yxatdan o‘ting</a>.
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Yopish"></button>
+  </div>
+
+  <div id="chat-list" class="chat-list">
+    <!-- Tarixni ko'rsatish -->
+    {% if selected_subject_id %}
+      {% for h in history %}
+      <div class="chat-bubble chat-user align-self-end">
+        {{ h.prompt }}
+        <small class="text-muted d-block mt-1">{{ h.created_at|date:"H:i" }}</small>
+      </div>
+      {% if h.image_url %}
+      <div class="chat-bubble chat-bot align-self-start">
+        <div class="image-grid {% if h.image_url|length == 1 %}one-image{% elif h.image_url|length == 2 %}two-images{% else %}three-plus-images{% endif %}">
+          {% for url in h.image_url %}
+          <div class="image-card">
+            <img src="{{ url }}" alt="Yaratilgan rasm">
+            <a href="{{ url }}" download class="download-btn" title="Rasmni yuklab olish">⬇️</a>
+          </div>
+          {% endfor %}
+        </div>
+        <small class="text-muted d-block mt-1">{{ h.created_at|date:"H:i" }}</small>
+      </div>
+      {% endif %}
+      {% empty %}
+      <div class="text-center text-white">Chat tarixi mavjud emas</div>
+      {% endfor %}
+    {% else %}
+      <div class="text-center text-white">Mavzu tanlang yoki yangi chat boshlang</div>
+    {% endif %}
+    <!-- Spinner -->
+    <div id="loading-spinner" class="text-center my-3" style="display: none;">
+      <div class="spinner-border text-light" role="status">
+        <span class="visually-hidden">Yuklanmoqda...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form -->
+  <div class="d-flex justify-content-center p-3 border-top">
+    <form id="text-form" method="POST" action="/" class="w-100" style="max-width: 600px;">
+      {% csrf_token %}
+      <input type="hidden" name="subject_id" id="selectedSubject" value="{{ selected_subject_id }}">
+      <div class="input-group">
+        <textarea 
+          id="text-input"
+          name="text" 
+          class="form-control auto-expand" 
+          rows="1" 
+          placeholder="Matn kiriting (uz, ru, en)..."
+          oninput="autoResize(this)"
+          required
+        ></textarea>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-send-fill"></i>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+      const toggleBtn = document.getElementById("toggleSidebar");
+      const closeBtn = document.getElementById("closeSidebar");
+      const sidebar = document.getElementById("sidebar");
+      const textarea = document.getElementById("text-input");
+      const chatContainer = document.getElementById("chat-list");
+      const spinner = document.getElementById("loading-spinner");
+      const form = document.getElementById("text-form");
+      const selectedSubjectInput = document.getElementById("selectedSubject");
+
+      // Spinnerni tekshirish
+      if (!spinner) {
+          console.error("Spinner elementi topilmadi!");
+      }
+
+      // Sidebar toggle
+      toggleBtn.onclick = () => {
+          sidebar.classList.remove("d-none");
+          toggleBtn.classList.add("d-none");
+      };
+
+      closeBtn.onclick = () => {
+          sidebar.classList.add("d-none");
+          toggleBtn.classList.remove("d-none");
+      };
+
+      // Matn maydonining avtomatik balandligini sozlash
+      function autoResize(el) {
+          el.style.height = "auto";
+          el.style.height = (el.scrollHeight) + "px";
+      }
+
+      // Chat oynasini oxiriga aylantirish
+      function scrollToBottom() {
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+
+      // Avtomatik balandlik va Enter hodisasi
+      if (textarea) {
+          textarea.addEventListener("input", function () {
+              autoResize(this);
+          });
+
+          textarea.addEventListener("keydown", function (event) {
+              if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  this.form.dispatchEvent(new Event("submit", { cancelable: true }));
+              }
+          });
+
+          autoResize(textarea);
+      }
+
+      // Yangi mavzu boshlash
+      window.startNewSubject = function () {
+          selectedSubjectInput.value = "";
+          document.querySelectorAll(".subject-item").forEach(el => el.classList.remove("bg-secondary"));
+
+          // Chat oynasini tozalash
+          chatContainer.innerHTML = `
+              <div class="text-center text-white">Yangi mavzu yaratildi. Birinchi promptni kiriting.</div>
+              <div id="loading-spinner" class="text-center my-3" style="display: none;">
+                  <div class="spinner-border text-light" role="status">
+                      <span class="visually-hidden">Yuklanmoqda...</span>
+                  </div>
+              </div>
+          `;
+
+          // Spinnerni qayta tanlash (yangi HTML qo'shilgandan keyin)
+          const newSpinner = document.getElementById("loading-spinner");
+          if (newSpinner) {
+              spinner.replaceWith(newSpinner);
+          }
+
+          // Serverga yangi mavzu yaratish so'rovi
+          fetch('/new-subject/', {
+              method: 'POST',
+              headers: {
+                  'X-Requested-With': 'XMLHttpRequest',
+                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+              },
+              body: JSON.stringify({ action: 'new_subject' })
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (data.subjects) {
+                  const subjectList = document.querySelector("#sidebar ul.list-unstyled");
+                  subjectList.innerHTML = `
+                      <li>
+                          <label class="text-white mb-1">➕ Yangi mavzu:</label>
+                          <input type="hidden" name="subject_id" id="subjectIdInput">
+                          <button class="btn btn-sm btn-success w-100 mb-2" onclick="startNewSubject()">Yangi chat</button>
+                      </li>
+                      <li class="text-white mb-2">📂 Eski mavzular:</li>
+                      ${data.subjects.map(s => `
+                          <li class="subject-item py-1 px-2 ${s.id === data.new_subject_id ? 'bg-secondary' : ''}">
+                              <a href="javascript:void(0)" onclick="selectSubject('${s.id}')">${s.subject || 'Yangi mavzu'}</a>
+                          </li>
+                      `).join('') || '<li class="text-muted">Mavzular mavjud emas</li>'}
+                  `;
+              }
+              if (data.new_subject_id) {
+                  selectedSubjectInput.value = data.new_subject_id;
+              }
+              scrollToBottom();
+          })
+          .catch(error => {
+              console.error("Xatolik:", error);
+              alert("Yangi mavzu ochishda xatolik yuz berdi.");
+          });
+      };
+
+      // Mavjud mavzuni tanlash
+      window.selectSubject = function (id) {
+          selectedSubjectInput.value = id;
+          document.querySelectorAll(".subject-item").forEach(el => el.classList.remove("bg-secondary"));
+          const selected = Array.from(document.querySelectorAll(".subject-item")).find(li => li.getAttribute("onclick")?.includes(id));
+          if (selected) selected.classList.add("bg-secondary");
+
+          // Tanlangan mavzu tarixini yuklash
+          if (spinner) spinner.style.display = "block";
+          fetch(`/get-subject-history/${id}/`, {
+              method: 'GET',
+              headers: {
+                  'X-Requested-With': 'XMLHttpRequest'
+              }
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (spinner) spinner.style.display = "none";
+              chatContainer.innerHTML = `
+                  <div id="loading-spinner" class="text-center my-3" style="display: none;">
+                      <div class="spinner-border text-light" role="status">
+                          <span class="visually-hidden">Yuklanmoqda...</span>
+                      </div>
+                  </div>
+              `;
+              // Spinnerni qayta tanlash
+              const newSpinner = document.getElementById("loading-spinner");
+              if (newSpinner) {
+                  spinner.replaceWith(newSpinner);
+              }
+              if (data.history && data.history.length > 0) {
+                  data.history.forEach(h => {
+                      // Prompt qo'shish
+                      const userBubble = document.createElement("div");
+                      userBubble.className = "chat-bubble chat-user align-self-end";
+                      userBubble.innerHTML = `${h.prompt}<small class="text-muted d-block mt-1">${new Date(h.created_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}</small>`;
+                      chatContainer.appendChild(userBubble);
+
+                      // Rasmlar qo'shish
+                      if (h.image_url && h.image_url.length > 0) {
+                          const botBubble = document.createElement("div");
+                          botBubble.className = "chat-bubble chat-bot align-self-start";
+                          const imageGrid = document.createElement("div");
+                          imageGrid.className = `image-grid ${h.image_url.length === 1 ? 'one-image' : h.image_url.length === 2 ? 'two-images' : 'three-plus-images'}`;
+                          
+                          h.image_url.forEach(url => {
+                              const imageCard = document.createElement("div");
+                              imageCard.className = "image-card";
+                              const img = document.createElement("img");
+                              img.src = url;
+                              img.alt = "Yaratilgan rasm";
+                              imageCard.appendChild(img);
+                              const downloadBtn = document.createElement("a");
+                              downloadBtn.href = url;
+                              downloadBtn.download = "";
+                              downloadBtn.className = "download-btn";
+                              downloadBtn.title = "Rasmni yuklab olish";
+                              downloadBtn.textContent = "⬇️";
+                              imageCard.appendChild(downloadBtn);
+                              imageGrid.appendChild(imageCard);
+                          });
+
+                          botBubble.appendChild(imageGrid);
+                          botBubble.innerHTML += `<small class="text-muted d-block mt-1">${new Date(h.created_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}</small>`;
+                          chatContainer.appendChild(botBubble);
+                      }
+                  });
+              } else {
+                  chatContainer.innerHTML = `
+                      <div class="text-center text-white">Chat tarixi mavjud emas</div>
+                      <div id="loading-spinner" class="text-center my-3" style="display: none;">
+                          <div class="spinner-border text-light" role="status">
+                              <span class="visually-hidden">Yuklanmoqda...</span>
+                          </div>
+                      </div>
+                  `;
+                  // Spinnerni qayta tanlash
+                  const newSpinner = document.getElementById("loading-spinner");
+                  if (newSpinner) {
+                      spinner.replaceWith(newSpinner);
+                  }
+              }
+              scrollToBottom();
+          })
+          .catch(error => {
+              if (spinner) spinner.style.display = "none";
+              console.error("Xatolik:", error);
+              alert("Mavzu tarixini yuklashda xatolik yuz berdi.");
+          });
+      };
+
+      // Form yuborish
+      form.addEventListener("submit", function (e) {
+          e.preventDefault();
+          const userText = textarea.value.trim();
+          if (!userText) return;
+
+          // Foydalanuvchi promptini ko'rsatish
+          const userBubble = document.createElement("div");
+          userBubble.className = "chat-bubble chat-user align-self-end";
+          userBubble.innerHTML = `${userText}<small class="text-muted d-block mt-1">${new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}</small>`;
+          chatContainer.appendChild(userBubble);
+
+          // Spinnerni ko'rsatish
+          if (spinner) spinner.style.display = "block";
+          scrollToBottom();
+
+          const formData = new FormData(form);
+          fetch(form.action, {
+              method: "POST",
+              body: formData,
+              headers: {
+                  'X-Requested-With': 'XMLHttpRequest'
+              }
+          })
+          .then(response => response.json())
+          .then(data => {
+              if (spinner) spinner.style.display = "none";
+
+              // Serverdan qaytgan rasmlarni ko'rsatish
+              if (data.image_urls && data.image_urls.length > 0) {
+                  const botBubble = document.createElement("div");
+                  botBubble.className = "chat-bubble chat-bot align-self-start";
+                  const imageGrid = document.createElement("div");
+                  imageGrid.className = `image-grid ${data.image_urls.length === 1 ? 'one-image' : data.image_urls.length === 2 ? 'two-images' : 'three-plus-images'}`;
+                  
+                  data.image_urls.forEach(url => {
+                      const imageCard = document.createElement("div");
+                      imageCard.className = "image-card";
+                      const img = document.createElement("img");
+                      img.src = url;
+                      img.alt = "Yaratilgan rasm";
+                      imageCard.appendChild(img);
+                      const downloadBtn = document.createElement("a");
+                      downloadBtn.href = url;
+                      downloadBtn.download = "";
+                      downloadBtn.className = "download-btn";
+                      downloadBtn.title = "Rasmni yuklab olish";
+                      downloadBtn.textContent = "⬇️";
+                      imageCard.appendChild(downloadBtn);
+                      imageGrid.appendChild(imageCard);
+                  });
+
+                  botBubble.appendChild(imageGrid);
+                  botBubble.innerHTML += `<small class="text-muted d-block mt-1">${new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}</small>`;
+                  chatContainer.appendChild(botBubble);
+              }
+
+              scrollToBottom();
+              textarea.value = "";
+              autoResize(textarea);
+
+              // Token xatosi
+              if (data.token_error) {
+                  const tokenAlert = document.getElementById("tokenErrorAlert");
+                  if (tokenAlert) tokenAlert.classList.remove("d-none");
+              }
+
+              // Yangi mavzular va tarixni yangilash
+              if (data.subjects) {
+                  const subjectList = document.querySelector("#sidebar ul.list-unstyled");
+                  subjectList.innerHTML = `
+                      <li>
+                          <label class="text-white mb-1">➕ Yangi mavzu:</label>
+                          <input type="hidden" name="subject_id" id="subjectIdInput">
+                          <button class="btn btn-sm btn-success w-100 mb-2" onclick="startNewSubject()">Yangi chat</button>
+                      </li>
+                      <li class="text-white mb-2">📂 Eski mavzular:</li>
+                      ${data.subjects.map(s => `
+                          <li class="subject-item py-1 px-2 ${s.id === data.selected_subject_id ? 'bg-secondary' : ''}">
+                              <a href="javascript:void(0)" onclick="selectSubject('${s.id}')">${s.subject || 'Yangi mavzu'}</a>
+                          </li>
+                      `).join('') || '<li class="text-muted">Mavzular mavjud emas</li>'}
+                  `;
+              }
+          })
+          .catch(error => {
+              if (spinner) spinner.style.display = "none";
+              alert("Xatolik yuz berdi. Iltimos, keyinroq urinib ko‘ring.");
+              console.error("Xatolik:", error);
+          });
+      });
+
+      // Dastlabki yuklash
+      scrollToBottom();
+      autoResize(textarea);
+
+      // Serverdan tanlangan mavzuni belgilash
+      {% if selected_subject_id %}
+          selectSubject("{{ selected_subject_id }}");
+      {% endif %}
+
+      // Token xatosi ko'rsatish
+      {% if token_error %}
+          const tokenAlert = document.getElementById("tokenErrorAlert");
+          if (tokenAlert) tokenAlert.classList.remove("d-none");
+      {% endif %}
+  });
+
+</script>
+
+</body>
+</html>
