@@ -30,8 +30,7 @@ Follow the steps below to run the project locally on either Windows or Linux/mac
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/username/text-to-image-ai.git
-cd text-to-image-ai
+git clone https://github.com/Abror5555/AI-Image-Creator.git
 ```
 
 ### 2. Create a Virtual Environment
